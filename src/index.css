@@ -1,6 +1,9 @@
 :root {
   --ui-font: 'Segoe UI', 'Aptos', Tahoma, sans-serif;
   --mono-font: 'Consolas', 'Cascadia Code', monospace;
+  --mf-bg: #f7f6f1;
+  --mf-text: #1a2035;
+  --mf-ui-font: 'Segoe UI', 'Aptos', Tahoma, sans-serif;
 }
 
 * {
@@ -16,6 +19,11 @@ body,
 }
 
 body {
+  background: var(--mf-bg);
+  color: var(--mf-text);
   font-family: var(--ui-font);
-  color: #1a2035;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

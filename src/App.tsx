@@ -2,9 +2,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import './App.css'
+import {
+  buildExportDocument,
+  defaultThemeId,
+  getTheme,
+  themes,
+  toThemeStyle,
+  type ThemeId,
+} from './themes'
 
 const DRAFT_STORAGE_KEY = 'markforge.draft.v1'
 const RECENT_FILES_KEY = 'markforge.recentFiles.v1'
+const THEME_STORAGE_KEY = 'markforge.theme.v1'
 
 const mdEngine = new MarkdownIt({
   html: true,
@@ -46,8 +55,13 @@ function App() {
       return []
     }
   })
+  const [themeId, setThemeId] = useState<ThemeId>(() => {
+    return (localStorage.getItem(THEME_STORAGE_KEY) as ThemeId | null) ?? defaultThemeId
+  })
   const [status, setStatus] = useState('Ready')
   const isDirty = content !== lastSavedContent
+  const theme = getTheme(themeId)
+  const themeStyle = toThemeStyle(theme)
 
   const html = useMemo(() => {
     const parsed = mdEngine.render(content)
@@ -146,9 +160,10 @@ function App() {
     }
 
     const baseName = 'document'
+    const documentHtml = buildExportDocument(theme, html, baseName)
     const exportContent =
       format === 'html'
-        ? `<!doctype html><html><head><meta charset="UTF-8" /><title>${baseName}</title></head><body>${html}</body></html>`
+        ? documentHtml
         : format === 'txt'
           ? content.replace(/[#*_`>-]/g, '')
           : content
@@ -157,13 +172,13 @@ function App() {
       format,
       suggestedName: `${baseName}.${format}`,
       content: exportContent,
-      html,
+      html: documentHtml,
     })
 
     if (result) {
       setStatus(`Exported ${result.filePath}`)
     }
-  }, [content, html])
+  }, [content, html, theme])
 
   const newDocument = useCallback(() => {
     if (!shouldDiscardUnsaved()) {
@@ -188,6 +203,17 @@ function App() {
   useEffect(() => {
     localStorage.setItem(RECENT_FILES_KEY, JSON.stringify(recentFiles))
   }, [recentFiles])
+
+  useEffect(() => {
+    localStorage.setItem(THEME_STORAGE_KEY, themeId)
+  }, [themeId])
+
+  useEffect(() => {
+    const root = document.documentElement
+    for (const [variableName, value] of Object.entries(theme.variables)) {
+      root.style.setProperty(variableName, value)
+    }
+  }, [theme])
 
   useEffect(() => {
     document.title = `${isDirty ? '* ' : ''}MarkForge`
@@ -225,13 +251,26 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" data-theme={theme.id} style={themeStyle}>
       <header className="app-header">
         <div>
           <h1>MarkForge</h1>
           <p>Desktop Markdown editor for Windows and Linux.</p>
         </div>
         <div className="toolbar">
+          <label className="theme-picker">
+            <span>Theme</span>
+            <select
+              value={themeId}
+              onChange={(event) => setThemeId(event.target.value as ThemeId)}
+            >
+              {themes.map((themeOption) => (
+                <option key={themeOption.id} value={themeOption.id}>
+                  {themeOption.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <button onClick={newDocument}>New</button>
           <button onClick={openFile}>Open</button>
           <button onClick={saveFile}>Save</button>
@@ -276,7 +315,7 @@ function App() {
         </article>
 
         <article className="panel preview-panel">
-          <div className="panel-title">Preview</div>
+          <div className="panel-title">Preview · {theme.label}</div>
           <div className="preview" dangerouslySetInnerHTML={{ __html: html }} />
         </article>
       </section>
@@ -285,6 +324,7 @@ function App() {
         <span>{status}</span>
         <span>{isDirty ? 'Unsaved changes' : 'All changes saved'}</span>
         <span>{activePath ?? 'Untitled document'}</span>
+        <span>{theme.description}</span>
       </footer>
     </main>
   )
