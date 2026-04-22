@@ -31,11 +31,17 @@ This roadmap groups the product into implementation pipelines so the app grows i
 
 ## Phase 4: Export and Publishing
 
-- Export to Markdown, HTML, PDF, DOCX, and EPUB
+- Export to Markdown, HTML, PDF, DOCX, EPUB, and PowerPoint (PPTX)
 - Styled exports that preserve the active theme
 - Table of contents generation and page layout controls
 - Batch export for whole workspaces or split documents
 - Optional static-site publishing presets
+
+## Phase 4 Notes: PowerPoint Export
+
+- Convert Markdown sections into slide decks with one file per slide or section group
+- Preserve theme tokens across title slides, body slides, and speaker-note style metadata
+- Keep the slide export reversible by tracking source section anchors and slide order
 
 ## Phase 5: Advanced Writing Tools
 

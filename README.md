@@ -74,6 +74,8 @@ npm run dist:linux
 
 Artifacts are emitted under `release/`.
 
+Published Windows and Linux installers will be attached to GitHub Releases for tagged versions.
+
 ## Windows Packaging Note
 
 If local Windows packaging fails with a symbolic link privilege error from `electron-builder`, enable Windows Developer Mode (or run the terminal as Administrator) and retry.
