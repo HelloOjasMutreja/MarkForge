@@ -1,0 +1,94 @@
+# MarkForge
+
+MarkForge is an open-source desktop Markdown editor for Windows and Linux with live preview and multi-format export.
+
+## Current MVP Features
+
+- Desktop app shell with Electron
+- Markdown editing and live preview
+- Open and save local Markdown files
+- Export to Markdown, HTML, TXT, and PDF
+- Cross-platform packaging scripts for Windows and Linux
+
+## Tech Stack
+
+- React + TypeScript + Vite (renderer)
+- Electron (desktop runtime)
+- markdown-it + DOMPurify (rendering and sanitization)
+- electron-builder (distribution packaging)
+
+## Prerequisites
+
+- Node.js 22+
+- npm 11+
+
+## Local Development
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Run desktop mode (Vite + Electron):
+
+```bash
+npm run dev
+```
+
+Run web-only mode:
+
+```bash
+npm run dev:web
+```
+
+## Build and Package
+
+Build web renderer only:
+
+```bash
+npm run build:web
+```
+
+Create installers/packages for the current platform:
+
+```bash
+npm run build
+```
+
+Windows packages:
+
+```bash
+npm run dist:win
+```
+
+Linux packages:
+
+```bash
+npm run dist:linux
+```
+
+Artifacts are emitted under `release/`.
+
+## Versioning and Releases
+
+This project follows Semantic Versioning.
+
+1. Update `package.json` version.
+2. Commit and tag a release in the format `vX.Y.Z`.
+3. Push the tag to trigger GitHub Actions packaging workflow.
+
+## Open Source Standards
+
+- License: MIT
+- Contributor guide: CONTRIBUTING.md
+- Conduct: CODE_OF_CONDUCT.md
+- Security policy: SECURITY.md
+
+## Planned Milestones
+
+1. Rich editing (shortcuts, command palette, themes)
+2. Advanced Markdown support (Mermaid, math, tables UX)
+3. Publish integrations and plugin API
+4. Auto-updates and signed release pipeline
+
