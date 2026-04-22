@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import './App.css'
@@ -14,6 +14,7 @@ import {
 const DRAFT_STORAGE_KEY = 'markforge.draft.v1'
 const RECENT_FILES_KEY = 'markforge.recentFiles.v1'
 const THEME_STORAGE_KEY = 'markforge.theme.v1'
+const SPLIT_SESSION_STORAGE_KEY = 'markforge.splitSession.v1'
 
 type SplitStrategy = 'h1' | 'h2' | 'h3' | 'marker'
 type SplitView = 'all' | 'single'
@@ -23,6 +24,18 @@ interface MarkdownSection {
   title: string
   content: string
 }
+
+interface SplitSessionRecord {
+  isSplitMode: boolean
+  strategy: SplitStrategy
+  view: SplitView
+  activeSectionId: string | null
+  sections: MarkdownSection[]
+  contentSignature: string
+  updatedAt: string
+}
+
+type SplitSessionStore = Record<string, SplitSessionRecord>
 
 const mdEngine = new MarkdownIt({
   html: true,
@@ -139,6 +152,32 @@ function makeSections(markdown: string, strategy: SplitStrategy): MarkdownSectio
   }))
 }
 
+function normalizeMarkdown(markdown: string): string {
+  return markdown.replace(/\r\n/g, '\n').trim()
+}
+
+function makeContentSignature(markdown: string): string {
+  const normalized = normalizeMarkdown(markdown)
+  return `${normalized.length}:${normalized.slice(0, 120)}:${normalized.slice(-120)}`
+}
+
+function getSplitSessionKey(filePath: string | null): string {
+  return filePath && filePath.trim().length > 0 ? filePath.trim().toLowerCase() : '__untitled__'
+}
+
+function readSplitSessionStore(): SplitSessionStore {
+  try {
+    const raw = localStorage.getItem(SPLIT_SESSION_STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as SplitSessionStore) : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeSplitSessionStore(store: SplitSessionStore): void {
+  localStorage.setItem(SPLIT_SESSION_STORAGE_KEY, JSON.stringify(store))
+}
+
 function App() {
   const [content, setContent] = useState(() => {
     const saved = localStorage.getItem(DRAFT_STORAGE_KEY)
@@ -171,6 +210,7 @@ function App() {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
   const [splitPast, setSplitPast] = useState<MarkdownSection[][]>([])
   const [splitFuture, setSplitFuture] = useState<MarkdownSection[][]>([])
+  const didInitialSplitRestore = useRef(false)
 
   const isDirty = content !== lastSavedContent
   const theme = getTheme(themeId)
@@ -197,6 +237,85 @@ function App() {
     setSplitView('all')
   }, [])
 
+  const clearSplitSessionForPath = useCallback((filePath: string | null) => {
+    const key = getSplitSessionKey(filePath)
+    const store = readSplitSessionStore()
+    if (!store[key]) {
+      return
+    }
+
+    delete store[key]
+    writeSplitSessionStore(store)
+  }, [])
+
+  const applyRestoredSplitSession = useCallback(
+    (filePath: string | null, markdown: string): boolean => {
+      const key = getSplitSessionKey(filePath)
+      const store = readSplitSessionStore()
+      const session = store[key]
+
+      if (!session || !session.isSplitMode || !Array.isArray(session.sections)) {
+        return false
+      }
+
+      if (session.contentSignature !== makeContentSignature(markdown)) {
+        return false
+      }
+
+      const restoredSections = session.sections
+        .filter(
+          (section) =>
+            section &&
+            typeof section.title === 'string' &&
+            typeof section.content === 'string' &&
+            section.content.trim().length > 0,
+        )
+        .map((section, index) => ({
+          id: section.id || createSectionId(),
+          title: section.title || `Section ${index + 1}`,
+          content: section.content,
+        }))
+
+      if (restoredSections.length === 0) {
+        return false
+      }
+
+      const activeId = restoredSections.some((section) => section.id === session.activeSectionId)
+        ? session.activeSectionId
+        : restoredSections[0].id
+
+      setIsSplitMode(true)
+      setSplitStrategy(session.strategy ?? 'h2')
+      setSplitView(session.view ?? 'all')
+      setSections(restoredSections)
+      setActiveSectionId(activeId)
+      setSplitPast([])
+      setSplitFuture([])
+      setContent(joinSections(restoredSections))
+
+      return true
+    },
+    [],
+  )
+
+  const migrateSplitSessionKey = useCallback((fromPath: string | null, toPath: string | null) => {
+    const fromKey = getSplitSessionKey(fromPath)
+    const toKey = getSplitSessionKey(toPath)
+    if (fromKey === toKey) {
+      return
+    }
+
+    const store = readSplitSessionStore()
+    const fromRecord = store[fromKey]
+    if (!fromRecord) {
+      return
+    }
+
+    store[toKey] = fromRecord
+    delete store[fromKey]
+    writeSplitSessionStore(store)
+  }, [])
+
   const shouldDiscardUnsaved = useCallback(() => {
     if (!isDirty) {
       return true
@@ -220,13 +339,20 @@ function App() {
       return
     }
 
-    resetSplitState()
     setContent(result.content)
     setActivePath(result.filePath)
     setLastSavedContent(result.content)
     addRecentFile(result.filePath)
-    setStatus(`Opened ${result.filePath}`)
-  }, [addRecentFile, resetSplitState, shouldDiscardUnsaved])
+
+    const restored = applyRestoredSplitSession(result.filePath, result.content)
+    if (!restored) {
+      resetSplitState()
+      setStatus(`Opened ${result.filePath}`)
+      return
+    }
+
+    setStatus(`Opened ${result.filePath} and restored split session.`)
+  }, [addRecentFile, applyRestoredSplitSession, resetSplitState, shouldDiscardUnsaved])
 
   const openRecentFile = useCallback(
     async (filePath: string) => {
@@ -246,14 +372,21 @@ function App() {
         return
       }
 
-      resetSplitState()
       setContent(result.content)
       setActivePath(result.filePath)
       setLastSavedContent(result.content)
       addRecentFile(result.filePath)
-      setStatus(`Opened ${result.filePath}`)
+
+      const restored = applyRestoredSplitSession(result.filePath, result.content)
+      if (!restored) {
+        resetSplitState()
+        setStatus(`Opened ${result.filePath}`)
+        return
+      }
+
+      setStatus(`Opened ${result.filePath} and restored split session.`)
     },
-    [addRecentFile, resetSplitState, shouldDiscardUnsaved],
+    [addRecentFile, applyRestoredSplitSession, resetSplitState, shouldDiscardUnsaved],
   )
 
   const saveFile = useCallback(async () => {
@@ -274,8 +407,9 @@ function App() {
     setActivePath(result.filePath)
     setLastSavedContent(content)
     addRecentFile(result.filePath)
+    migrateSplitSessionKey(activePath, result.filePath)
     setStatus(`Saved ${result.filePath}`)
-  }, [activePath, addRecentFile, content])
+  }, [activePath, addRecentFile, content, migrateSplitSessionKey])
 
   const exportFile = useCallback(
     async (format: 'md' | 'html' | 'txt' | 'pdf') => {
@@ -316,8 +450,9 @@ function App() {
     setContent(starterDocument)
     setLastSavedContent(starterDocument)
     setActivePath(null)
+    clearSplitSessionForPath(null)
     setStatus('Started a new document')
-  }, [resetSplitState, shouldDiscardUnsaved])
+  }, [clearSplitSessionForPath, resetSplitState, shouldDiscardUnsaved])
 
   const startSplitWorkflow = () => {
     const nextSections = makeSections(content, splitStrategy)
@@ -350,7 +485,12 @@ function App() {
   const renameSection = (sectionId: string, nextTitle: string) => {
     const normalizedTitle = nextTitle.trim() || 'Untitled Section'
     const existing = sections.find((section) => section.id === sectionId)
-    if (!existing || existing.title === normalizedTitle) {
+    if (!existing) {
+      return
+    }
+
+    const nextContent = withUpdatedHeading(existing.content, normalizedTitle)
+    if (existing.title === normalizedTitle && existing.content === nextContent) {
       return
     }
 
@@ -468,6 +608,7 @@ function App() {
     }
 
     const merged = joinSections(sections)
+    clearSplitSessionForPath(activePath)
     resetSplitState()
     setContent(merged)
     setStatus('Merged sections back into one Markdown document.')
@@ -487,8 +628,42 @@ function App() {
   }, [recentFiles])
 
   useEffect(() => {
+    const key = getSplitSessionKey(activePath)
+    const store = readSplitSessionStore()
+
+    if (!isSplitMode || sections.length === 0) {
+      if (store[key]) {
+        delete store[key]
+        writeSplitSessionStore(store)
+      }
+      return
+    }
+
+    store[key] = {
+      isSplitMode: true,
+      strategy: splitStrategy,
+      view: splitView,
+      activeSectionId,
+      sections: cloneSections(sections),
+      contentSignature: makeContentSignature(joinSections(sections)),
+      updatedAt: new Date().toISOString(),
+    }
+
+    writeSplitSessionStore(store)
+  }, [activePath, activeSectionId, isSplitMode, sections, splitStrategy, splitView])
+
+  useEffect(() => {
     localStorage.setItem(THEME_STORAGE_KEY, themeId)
   }, [themeId])
+
+  useEffect(() => {
+    if (didInitialSplitRestore.current) {
+      return
+    }
+
+    didInitialSplitRestore.current = true
+    applyRestoredSplitSession(activePath, content)
+  }, [activePath, applyRestoredSplitSession, content])
 
   useEffect(() => {
     const root = document.documentElement
