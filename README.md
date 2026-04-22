@@ -10,6 +10,9 @@ MarkForge is an open-source desktop Markdown editor for Windows and Linux with l
 - Recent files list with quick reopen
 - Draft autosave and unsaved-change protection
 - Keyboard save shortcut (`Ctrl+S` / `Cmd+S`)
+- Split large Markdown files into named sections (H1/H2/H3 or marker breakpoints)
+- Edit all split sections together or focus a single section
+- Section breakpoint insertion/removal with split-step undo/redo
 - Shared theme selector for UI, preview, and exports
 - Export to Markdown, HTML, TXT, and PDF
 - Cross-platform packaging scripts for Windows and Linux
