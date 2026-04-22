@@ -4,6 +4,7 @@ declare global {
   interface Window {
     desktopAPI?: {
       openFile: () => Promise<{ filePath: string; content: string } | null>
+      openFileByPath: (filePath: string) => Promise<{ filePath: string; content: string } | null>
       saveFile: (payload: { filePath?: string | null; content: string }) => Promise<{ filePath: string } | null>
       exportFile: (payload: {
         format: 'md' | 'html' | 'txt' | 'pdf'

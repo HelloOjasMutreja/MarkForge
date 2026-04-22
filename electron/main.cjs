@@ -59,6 +59,19 @@ ipcMain.handle('file:open', async () => {
   return { filePath, content };
 });
 
+ipcMain.handle('file:openPath', async (_event, filePath) => {
+  if (!filePath || typeof filePath !== 'string') {
+    return null;
+  }
+
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+    return { filePath, content };
+  } catch {
+    return null;
+  }
+});
+
 ipcMain.handle('file:save', async (_event, payload) => {
   const hasPath = payload.filePath && payload.filePath.trim().length > 0;
 
