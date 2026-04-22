@@ -94,8 +94,11 @@ This project follows Semantic Versioning.
 
 ## Planned Milestones
 
-1. Rich editing (shortcuts, command palette, themes)
-2. Advanced Markdown support (Mermaid, math, tables UX)
-3. Publish integrations and plugin API
-4. Auto-updates and signed release pipeline
+1. Editor core expansion: tabs, outline, search, and command palette
+2. Split-document workflow: breakpoints, section naming, merge/unmerge, undo/redo
+3. Theme pipeline: shared app, preview, and export themes
+4. Advanced Markdown support: Mermaid, math, tables UX, callouts
+5. Publish integrations, plugin API, and release automation
+
+See [ROADMAP.md](ROADMAP.md) for the full implementation pipeline.
 
