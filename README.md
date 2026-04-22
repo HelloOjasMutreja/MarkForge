@@ -70,6 +70,10 @@ npm run dist:linux
 
 Artifacts are emitted under `release/`.
 
+## Windows Packaging Note
+
+If local Windows packaging fails with a symbolic link privilege error from `electron-builder`, enable Windows Developer Mode (or run the terminal as Administrator) and retry.
+
 ## Versioning and Releases
 
 This project follows Semantic Versioning.
